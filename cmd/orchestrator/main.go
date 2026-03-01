@@ -20,6 +20,19 @@ func main() {
 
 	// 1. Create the router/mux
 	mux := http.NewServeMux()
+	
+	// Bonus: Basic Metrics Endpoint
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		
+		// Thread-safe read of the current stream count
+		manager.RLock()
+		count := len(manager.Streams)
+		manager.RUnlock()
+		
+		fmt.Fprintf(w, `{"active_streams": %d, "status": "up"}`, count)
+	})
+
 	mux.HandleFunc("/streams/", func(w http.ResponseWriter, r *http.Request) {
 		// Breakdown URL into segments: "streams/ID/renditions/Name/..."
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
