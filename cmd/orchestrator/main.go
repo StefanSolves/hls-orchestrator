@@ -11,11 +11,17 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"log/slog"
 
 	"hls-orchestrator/internal/streaming"
 )
 
 func main() {
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+    slog.SetDefault(logger)
+
+
 	manager := streaming.NewManager()
 
 	// 1. Create the router/mux
@@ -79,7 +85,7 @@ func main() {
 
 	// 4. Run server in a goroutine so it doesn't block
 	go func() {
-		fmt.Println("HLS Orchestrator starting on :8080...")
+		slog.Info("HLS Orchestrator starting on :8080...")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Listen error: %s\n", err)
 		}
@@ -87,7 +93,7 @@ func main() {
 
 	// 5. Block until a signal is received
 	<-stop
-	fmt.Println("\nShutting down server gracefully...")
+	slog.Info("\nShutting down server gracefully...")
 
 	// 6. Give the server 5 seconds to finish active requests
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -97,7 +103,7 @@ func main() {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
-	fmt.Println("Server stopped.")
+	slog.Info("Server stopped.")
 }
 
 //  handleRegisterSegment decodes and adds a new video segment to a 6-segment sliding window.
@@ -108,6 +114,10 @@ func handleRegisterSegment(w http.ResponseWriter, r *http.Request, m *streaming.
 		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
+
+	slog.Info("segment_received", "stream_id", streamID, "rendition", renditionName, "segment_name", seg.Sequence)
+
+
 	rend := m.GetOrCreateRendition(streamID, renditionName, 6)
 	if err := rend.AddSegment(seg); err != nil {
 		http.Error(w, err.Error(), http.StatusForbidden)
