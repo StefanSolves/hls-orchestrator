@@ -53,30 +53,32 @@ Overhead: Shorter segments (or partial CMAF chunks) exponentially increase the n
 
 Stability: A smaller buffer leaves the video player highly susceptible to "stalling" (buffering spinners) if the user's network speed fluctuates even slightly.
 
+
 **Testing with Curl**
-To quickly verify the system, live stream can be simulated by running these commands in order:
 
-1. Push initial segments:
+To verify the sliding window and contiguity logic, you can simulate a live stream by running these commands in order from a second terminal:
 
-for i in {1..3}; do
-  curl -X POST http://localhost:8080/streams/test/renditions/720p/segments \
-  -d "{\"sequence\": $i, \"duration\": 2.0, \"path\": \"/segments/$i.ts\"}"
-done
+**1. Push initial segments (1 to 3):**
+for i in {1..3}; do curl -i -X POST http://localhost:8080/streams/test/renditions/720p/segments -d "{\"sequence\": $i, \"duration\": 2.0, \"path\": \"/segments/$i.ts\"}"; done
 
 2. Retrieve the playlist:
-
 curl -i http://localhost:8080/streams/test/renditions/720p/playlist.m3u8
 
-3. Simulate a gap (Push segment 5, skipping 4):
-
-curl -X POST http://localhost:8080/streams/test/renditions/720p/segments \
-  -d '{"sequence": 5, "duration": 2.0, "path": "/segments/5.ts"}'
+3. Simulate a network drop (Push segment 5, skipping 4):
+curl -i -X POST http://localhost:8080/streams/test/renditions/720p/segments -d '{"sequence": 5, "duration": 2.0, "path": "/segments/5.ts"}'
 
 
-4. Heal the stream (Push the missing segment 4)
+4. Verify Gap-Hiding (Segment 5 will be hidden from the manifest):
+curl -i http://localhost:8080/streams/test/renditions/720p/playlist.m3u8
 
-curl -X POST http://localhost:8080/streams/test/renditions/720p/segments \
-  -d '{"sequence": 4, "duration": 2.0, "path": "/segments/4.ts"}'
+5. Heal the stream (Push the delayed segment 4):
+curl -i -X POST http://localhost:8080/streams/test/renditions/720p/segments -d '{"sequence": 4, "duration": 2.0, "path": "/segments/4.ts"}'
 
-5. Close the stream:
-curl -X POST http://localhost:8080/streams/test/end
+6. Verify Healing (Segments 4 and 5 will now appear together):
+curl -i http://localhost:8080/streams/test/renditions/720p/playlist.m3u8
+
+7. Close the stream:
+curl -i -X POST http://localhost:8080/streams/test/end
+
+8. Verify the #EXT-X-ENDLIST tag is appended:
+curl -i http://localhost:8080/streams/test/renditions/720p/playlist.m3u8
