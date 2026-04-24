@@ -89,14 +89,7 @@ export default function Home() {
 
       {/* Upload */}
       <div className="px-4 py-4 border-b border-hairline">
-        {uploadResult ? (
-          <div className="text-sm text-muted">
-            <span className="font-mono">{uploadResult.segments.length}</span> segments ready
-            ({uploadResult.totalDuration.toFixed(1)}s total)
-          </div>
-        ) : (
-          <UploadPanel onUploadComplete={handleUpload} />
-        )}
+        <UploadPanel onUploadComplete={handleUpload} />
       </div>
 
       {/* Controls */}
