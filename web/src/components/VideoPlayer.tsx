@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 
+type PlayerStatus = "idle" | "loading-manifest" | "buffering" | "playing";
+
 interface VideoPlayerProps {
   active: boolean;
   onVideoStateChange?: (state: "idle" | "playing" | "paused" | "waiting") => void;
@@ -14,6 +16,7 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [showUnmuteOverlay, setShowUnmuteOverlay] = useState(false);
+  const [playerStatus, setPlayerStatus] = useState<PlayerStatus>("idle");
 
   const handleVideoStateChange = useCallback(
     (state: "idle" | "playing" | "paused" | "waiting") => {
@@ -26,6 +29,7 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     if (!active) {
       handleVideoStateChange("idle");
       setShowUnmuteOverlay(false);
+      setPlayerStatus("idle");
       return;
     }
     if (!videoRef.current) return;
@@ -33,14 +37,18 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     const video = videoRef.current;
     const playlistUrl = "/api/playlist";
 
+    setPlayerStatus("loading-manifest");
+
     const handlePlay = () => {
       handleVideoStateChange("playing");
+      setPlayerStatus("playing");
       setShowUnmuteOverlay(true);
     };
     const handlePause = () => handleVideoStateChange("paused");
     const handleWaiting = () => handleVideoStateChange("waiting");
     const handlePlaying = () => {
       handleVideoStateChange("playing");
+      setPlayerStatus("playing");
       setShowUnmuteOverlay(true);
     };
 
@@ -53,6 +61,7 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = playlistUrl;
       video.addEventListener("loadedmetadata", () => {
+        setPlayerStatus("buffering");
         video.play().catch(() => {});
       });
       return () => {
@@ -80,13 +89,21 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     hls.attachMedia(video);
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      setPlayerStatus("buffering");
       video.play().catch(() => {});
+    });
+
+    let firstFragLoaded = false;
+    hls.on(Hls.Events.FRAG_LOADED, () => {
+      if (!firstFragLoaded) {
+        firstFragLoaded = true;
+        setPlayerStatus("playing");
+      }
     });
 
     hls.on(Hls.Events.ERROR, (_event, data) => {
       if (data.fatal) {
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          // Retry on network errors (playlist not ready yet)
           setTimeout(() => hls.startLoad(), 2000);
         } else {
           setError(`HLS error: ${data.details}`);
@@ -112,6 +129,8 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     setShowUnmuteOverlay(false);
   }
 
+  const showLoadingOverlay = active && (playerStatus === "loading-manifest" || playerStatus === "buffering");
+
   return (
     <div className="flex flex-col h-full">
       <h2 className="text-sm font-medium text-muted uppercase tracking-wide mb-2">
@@ -131,7 +150,18 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
               muted={isMuted}
               playsInline
             />
-            {showUnmuteOverlay && isMuted && (
+            {showLoadingOverlay && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-bg/80">
+                <svg width="20" height="20" viewBox="0 0 20 20" className="animate-spin mb-2">
+                  <circle cx="10" cy="10" r="8" fill="none" stroke="#D5D3CB" strokeWidth="2" />
+                  <path d="M10 2a8 8 0 0 1 8 8" fill="none" stroke="#6A6A63" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span className="text-xs text-muted font-sans">
+                  {playerStatus === "loading-manifest" ? "Loading manifest..." : "Buffering segments..."}
+                </span>
+              </div>
+            )}
+            {showUnmuteOverlay && isMuted && !showLoadingOverlay && (
               <button
                 onClick={handleUnmute}
                 className="absolute inset-0 flex items-center justify-center bg-ink/30 transition-opacity hover:bg-ink/40"
