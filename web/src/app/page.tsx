@@ -11,6 +11,7 @@ import { EventLog } from "@/components/EventLog";
 import { ViewToggle } from "@/components/ViewToggle";
 import type { ViewMode } from "@/components/ViewToggle";
 import { PipelineView } from "@/components/pipeline/PipelineView";
+import { StreamCompleteBanner } from "@/components/StreamCompleteBanner";
 import { usePacerEvents } from "@/hooks/usePacerEvents";
 import { usePlaylistPolling } from "@/hooks/usePlaylistPolling";
 import type { UploadResult } from "@/lib/types";
@@ -85,6 +86,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <StreamCompleteBanner pacerState={pacerState} segments={segments} onReset={handleReset} />
       <Header />
 
       {/* Upload */}
