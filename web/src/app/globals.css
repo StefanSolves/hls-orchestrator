@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #FAFAF7;
+  --color-ink: #0E0E0C;
+  --color-muted: #6A6A63;
+  --color-hairline: #E4E2D9;
+
+  --color-amber-bg: #FEF3C7;
+  --color-amber-border: #F59E0B;
+  --color-amber-ink: #92400E;
+
+  --color-teal-bg: #CCFBF1;
+  --color-teal-border: #14B8A6;
+  --color-teal-ink: #134E4A;
+
+  --color-slate-bg: #E2E8F0;
+  --color-slate-border: #94A3B8;
+  --color-slate-ink: #334155;
+
+  --color-coral-bg: #FFE4E6;
+  --color-coral-border: #FB7185;
+  --color-coral-ink: #9F1239;
+
+  --color-neutral-bg: #F0EFEB;
+  --color-neutral-border: #D5D3CB;
+  --color-neutral-ink: #6A6A63;
+
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-paper text-ink font-sans;
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 1.5s ease-in-out infinite;
+}
