@@ -92,6 +92,10 @@ function getWobble(chunk: PipelineChunk, now: number): number {
 }
 
 export function Conveyor({ chunks, pacerState, speed, segmentDuration }: ConveyorProps) {
+  // Temporary instrumentation to verify Fix A belt traversal delay (revert after confirmed)
+  if (chunks.size > 0) {
+    console.log('[Conveyor] chunks', chunks.size, [...chunks.values()].map(c => ({ seq: c.sequence, phase: c.phase, age: Date.now() - c.producedAt })));
+  }
   const beltRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
   const [, forceRender] = useState(0);
