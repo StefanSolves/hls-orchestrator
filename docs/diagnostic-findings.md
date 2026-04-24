@@ -32,6 +32,10 @@ One plausible theory: if the SSE connection drops and reconnects (see Symptom 3)
 
 Add a `console.log('uploadResult:', uploadResult)` to PipelineView's render to verify the prop. If the prop is null, trace upstream. If the prop is populated but SourceReel shows "no video", there's a deeper React issue.
 
+### Resolution (2026-04-24)
+
+Instrumentation confirmed the data flow is intact: `setUploadResult` fires with the correct payload, `PipelineView` receives it, and `SourceReel` renders it. The original symptom was transient — likely caused by HMR during development or a stale session state. **Not a bug.**
+
 ---
 
 ## Symptom 2: Conveyor shows "idle" while streaming

@@ -34,7 +34,6 @@ export default function Home() {
   const { playlist, windowSequences } = usePlaylistPolling(isActive);
 
   const handleUpload = useCallback(async (result: UploadResult) => {
-    console.log('[page] setUploadResult', result);
     setUploadResult(result);
   }, []);
 

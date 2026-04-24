@@ -27,7 +27,6 @@ export function PipelineView({
   playlist,
   videoState,
 }: PipelineViewProps) {
-  console.log('[PipelineView] render', { upload });
   const { chunks } = usePipelineChunks(events, pacerState);
 
   return (
