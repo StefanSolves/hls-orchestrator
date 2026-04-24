@@ -3,14 +3,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 
-type PlayerStatus = "idle" | "loading-manifest" | "buffering" | "playing";
+type PlayerStatus = "idle" | "waiting-for-segments" | "buffering" | "playing";
 
 interface VideoPlayerProps {
   active: boolean;
+  playlistReady: boolean;
   onVideoStateChange?: (state: "idle" | "playing" | "paused" | "waiting") => void;
 }
 
-export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
+export function VideoPlayer({ active, playlistReady, onVideoStateChange }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,101 +26,122 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     [onVideoStateChange]
   );
 
+  // Show waiting state when active but playlist not ready
   useEffect(() => {
     if (!active) {
       handleVideoStateChange("idle");
       setShowUnmuteOverlay(false);
       setPlayerStatus("idle");
-      return;
+    } else if (!playlistReady) {
+      setPlayerStatus("waiting-for-segments");
     }
-    if (!videoRef.current) return;
+  }, [active, playlistReady, handleVideoStateChange]);
 
-    const video = videoRef.current;
-    const playlistUrl = "/api/playlist";
+  // Create hls.js only after playlist is available (with 200ms settling delay)
+  useEffect(() => {
+    if (!active || !playlistReady || !videoRef.current) return;
 
-    setPlayerStatus("loading-manifest");
+    let cancelled = false;
+    const delayTimer = setTimeout(() => {
+      if (cancelled || !videoRef.current) return;
+      initHls(videoRef.current);
+    }, 200);
 
-    const handlePlay = () => {
-      handleVideoStateChange("playing");
-      setPlayerStatus("playing");
-      setShowUnmuteOverlay(true);
-    };
-    const handlePause = () => handleVideoStateChange("paused");
-    const handleWaiting = () => handleVideoStateChange("waiting");
-    const handlePlaying = () => {
-      handleVideoStateChange("playing");
-      setPlayerStatus("playing");
-      setShowUnmuteOverlay(true);
-    };
+    function initHls(video: HTMLVideoElement) {
+      const playlistUrl = "/api/playlist";
 
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handlePause);
-    video.addEventListener("waiting", handleWaiting);
-    video.addEventListener("playing", handlePlaying);
+      setPlayerStatus("buffering");
 
-    // Safari: native HLS support
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = playlistUrl;
-      video.addEventListener("loadedmetadata", () => {
-        setPlayerStatus("buffering");
+      const handlePlay = () => {
+        handleVideoStateChange("playing");
+        setPlayerStatus("playing");
+        setShowUnmuteOverlay(true);
+      };
+      const handlePause = () => handleVideoStateChange("paused");
+      const handleWaiting = () => handleVideoStateChange("waiting");
+      const handlePlaying = () => {
+        handleVideoStateChange("playing");
+        setPlayerStatus("playing");
+        setShowUnmuteOverlay(true);
+      };
+
+      video.addEventListener("play", handlePlay);
+      video.addEventListener("pause", handlePause);
+      video.addEventListener("waiting", handleWaiting);
+      video.addEventListener("playing", handlePlaying);
+
+      // Safari: native HLS support
+      if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = playlistUrl;
+        video.addEventListener("loadedmetadata", () => {
+          video.play().catch(() => {});
+        });
+        cleanupRef.current = () => {
+          video.removeEventListener("play", handlePlay);
+          video.removeEventListener("pause", handlePause);
+          video.removeEventListener("waiting", handleWaiting);
+          video.removeEventListener("playing", handlePlaying);
+          video.removeAttribute("src");
+        };
+        return;
+      }
+
+      // All others: hls.js
+      if (!Hls.isSupported()) {
+        setError("HLS is not supported in this browser");
+        return;
+      }
+
+      const hls = new Hls({
+        liveSyncDuration: 4,
+        liveMaxLatencyDuration: 10,
+        enableWorker: true,
+      });
+      hlsRef.current = hls;
+
+      hls.loadSource(playlistUrl);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.play().catch(() => {});
       });
-      return () => {
+
+      let firstFragLoaded = false;
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        if (!firstFragLoaded) {
+          firstFragLoaded = true;
+          setPlayerStatus("playing");
+        }
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            setTimeout(() => hls.startLoad(), 2000);
+          } else {
+            setError(`HLS error: ${data.details}`);
+          }
+        }
+      });
+
+      cleanupRef.current = () => {
         video.removeEventListener("play", handlePlay);
         video.removeEventListener("pause", handlePause);
         video.removeEventListener("waiting", handleWaiting);
         video.removeEventListener("playing", handlePlaying);
+        hls.destroy();
+        hlsRef.current = null;
       };
     }
 
-    // All others: hls.js
-    if (!Hls.isSupported()) {
-      setError("HLS is not supported in this browser");
-      return;
-    }
-
-    const hls = new Hls({
-      liveSyncDuration: 4,
-      liveMaxLatencyDuration: 10,
-      enableWorker: true,
-    });
-    hlsRef.current = hls;
-
-    hls.loadSource(playlistUrl);
-    hls.attachMedia(video);
-
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      setPlayerStatus("buffering");
-      video.play().catch(() => {});
-    });
-
-    let firstFragLoaded = false;
-    hls.on(Hls.Events.FRAG_LOADED, () => {
-      if (!firstFragLoaded) {
-        firstFragLoaded = true;
-        setPlayerStatus("playing");
-      }
-    });
-
-    hls.on(Hls.Events.ERROR, (_event, data) => {
-      if (data.fatal) {
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          setTimeout(() => hls.startLoad(), 2000);
-        } else {
-          setError(`HLS error: ${data.details}`);
-        }
-      }
-    });
+    const cleanupRef: { current: (() => void) | null } = { current: null };
 
     return () => {
-      video.removeEventListener("play", handlePlay);
-      video.removeEventListener("pause", handlePause);
-      video.removeEventListener("waiting", handleWaiting);
-      video.removeEventListener("playing", handlePlaying);
-      hls.destroy();
-      hlsRef.current = null;
+      cancelled = true;
+      clearTimeout(delayTimer);
+      cleanupRef.current?.();
     };
-  }, [active, handleVideoStateChange]);
+  }, [active, playlistReady, handleVideoStateChange]);
 
   function handleUnmute() {
     if (videoRef.current) {
@@ -129,7 +151,7 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
     setShowUnmuteOverlay(false);
   }
 
-  const showLoadingOverlay = active && (playerStatus === "loading-manifest" || playerStatus === "buffering");
+  const showLoadingOverlay = active && (playerStatus === "waiting-for-segments" || playerStatus === "buffering");
 
   return (
     <div className="flex flex-col h-full">
@@ -157,7 +179,7 @@ export function VideoPlayer({ active, onVideoStateChange }: VideoPlayerProps) {
                   <path d="M10 2a8 8 0 0 1 8 8" fill="none" stroke="#6A6A63" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 <span className="text-xs text-muted font-sans">
-                  {playerStatus === "loading-manifest" ? "Loading manifest..." : "Buffering segments..."}
+                  {playerStatus === "waiting-for-segments" ? "Waiting for first segment..." : "Buffering segments..."}
                 </span>
               </div>
             )}
