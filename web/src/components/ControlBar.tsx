@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import type { PacerStatus } from "@/lib/types";
 
 interface ControlBarProps {
@@ -40,6 +41,30 @@ export function ControlBar({
 
   const canStart = isIdle && hasSegments;
   const canEnd = isRunning || isPaused;
+
+  // Local speed for instant slider feedback; debounce the network call
+  const [localSpeed, setLocalSpeed] = useState(speed);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync local speed when server-side speed changes (e.g. on SSE status update)
+  useEffect(() => {
+    setLocalSpeed(speed);
+  }, [speed]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  function handleSliderChange(next: number) {
+    setLocalSpeed(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSpeedChange(next);
+    }, 150);
+  }
 
   let statusText: string;
   if (isIdle && !hasSegments) {
@@ -98,7 +123,7 @@ export function ControlBar({
         {/* Divider */}
         <div className="w-px h-6 bg-hairline" />
 
-        {/* Speed slider */}
+        {/* Speed slider — local state for instant feedback, debounced POST */}
         <div className="flex items-center gap-2">
           <label className="text-sm text-muted">Speed</label>
           <input
@@ -106,11 +131,11 @@ export function ControlBar({
             min={0.25}
             max={4}
             step={0.25}
-            value={speed}
-            onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
+            value={localSpeed}
+            onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
             className="w-28 accent-ink"
           />
-          <span className="text-sm font-mono w-10 text-right">{speed}x</span>
+          <span className="text-sm font-mono w-10 text-right">{localSpeed}x</span>
         </div>
 
         {/* Divider */}
