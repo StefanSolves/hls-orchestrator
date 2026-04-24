@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HLS Orchestrator — Web Demo
 
-## Getting Started
+A browser-based visualizer for the Go HLS orchestrator, designed for live technical talks. Makes the invisible parts of HLS visible: chunking, sliding window, out-of-order arrivals, media-sequence advancing, and deduplication.
 
-First, run the development server:
+## Prerequisites
+
+- Node.js 20+
+- ffmpeg on PATH (`brew install ffmpeg` or equivalent)
+- Go 1.21+ (to run the orchestrator)
+
+## Setup
+
+Terminal 1 — Go orchestrator:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+go run cmd/orchestrator/main.go
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Terminal 2 — Web demo:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+cd web
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open http://localhost:3000.
 
-## Learn More
+## How It Works
 
-To learn more about Next.js, take a look at the following resources:
+```
+Browser (:3000)          Next.js Server           Go Orchestrator (:8080)
+────────────────         ──────────────           ──────────────────────
+Upload .mp4 ───────────> ffmpeg segments
+                         to tmpdir
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Start ─────────────────> Pacer loop ────────────> POST segments
+                         (setTimeout,              (window=6, dedup,
+                          controllable speed)       gap detection)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+SSE events <───────────  emits per-segment
+                         state changes
 
-## Deploy on Vercel
+GET /api/playlist ─────> proxy ──────────────────> GET playlist.m3u8
+GET /api/segments/* ───> serve .ts from disk
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+hls.js player ─────────> fetches playlist + segments through Next.js
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Talk-Mode Tips
+
+- **Recommended speed:** 0.5x reads well from the back of the room
+- **Chaos mode:** Flip it on mid-stream to demo out-of-order arrivals and dedup. The amber window tiles will show gaps healing in real time.
+- **Explain the timeline:** Teal = received by orchestrator, Amber with ring = currently in the sliding window playlist, Coral = delayed/duplicated/failed
+- **End stream:** Click End to show `#EXT-X-ENDLIST` appearing in the playlist view
+
+## Known Limitations
+
+- Local-only (ffmpeg runs server-side in a Next.js API route)
+- Single active session at a time — uploading again replaces the previous session
+- No authentication or multi-user support
+- The Go orchestrator's window size (6) is hardcoded and not adjustable at runtime

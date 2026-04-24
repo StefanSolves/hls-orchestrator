@@ -82,3 +82,7 @@ curl -i -X POST http://localhost:8080/streams/test/end
 
 8. Verify the #EXT-X-ENDLIST tag is appended:
 curl -i http://localhost:8080/streams/test/renditions/720p/playlist.m3u8
+
+## Web Demo
+
+A browser-based frontend for demoing the orchestrator during technical talks is available in `web/`. See [web/README.md](web/README.md) for setup instructions.
