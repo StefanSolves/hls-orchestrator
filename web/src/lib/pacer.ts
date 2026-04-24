@@ -14,6 +14,11 @@ export class Pacer {
   private _uploadId: string | null = null;
   private _streamId: string | null = null;
   private segmentDuration: number;
+  // Demo concession: artificial delay between "produced" and HTTP POST so chunks
+  // visibly slide across the conveyor belt in the pipeline animation. On localhost
+  // the real round-trip is ~3ms, which makes the animation invisible.
+  // See docs/diagnostic-findings.md, Symptom 2.
+  private beltTraversalRatio = 0.7;
 
   constructor() {
     const config = getConfig();
@@ -127,9 +132,33 @@ export class Pacer {
     this._state = "idle";
   }
 
+  private tickIntervalMs(): number {
+    return (this.segmentDuration * 1000) / this._speed;
+  }
+
+  // Sleep that respects pause: polls every 50ms, only counts time while running.
+  // Returns false if pacer was stopped/ended during sleep (caller should abort).
+  private async sleepWhileRunning(totalMs: number): Promise<boolean> {
+    let remaining = totalMs;
+    while (remaining > 0) {
+      if (this._state !== "running" && this._state !== "paused") return false;
+      if (this._state === "paused") {
+        // Don't count paused time — just wait
+        await new Promise((r) => setTimeout(r, 50));
+        continue;
+      }
+      const chunk = Math.min(remaining, 50);
+      await new Promise((r) => setTimeout(r, chunk));
+      if (this._state === "running") {
+        remaining -= chunk;
+      }
+    }
+    return this._state === "running";
+  }
+
   private scheduleTick() {
     if (this._state !== "running") return;
-    const interval = (this.segmentDuration * 1000) / this._speed;
+    const interval = this.tickIntervalMs();
     this.timer = setTimeout(() => this.tick(), interval);
   }
 
@@ -188,7 +217,10 @@ export class Pacer {
       return;
     }
 
-    // Normal post
+    // Normal post — delay so chunk visibly traverses the conveyor belt
+    const traversalMs = this.tickIntervalMs() * this.beltTraversalRatio;
+    const stillRunning = await this.sleepWhileRunning(traversalMs);
+    if (!stillRunning) return; // pacer was stopped/ended during traversal
     await this.postSegment(this.currentIndex, sequence, seg);
     this.currentIndex++;
     this.scheduleTick();
