@@ -7,6 +7,7 @@ interface SourceReelProps {
 }
 
 export function SourceReel({ upload }: SourceReelProps) {
+  console.log('[SourceReel] render', { upload });
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 80, flexShrink: 0 }}>
       <div
