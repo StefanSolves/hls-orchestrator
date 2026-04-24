@@ -8,18 +8,24 @@ import { SegmentTimeline } from "@/components/SegmentTimeline";
 import { PlaylistView } from "@/components/PlaylistView";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { EventLog } from "@/components/EventLog";
+import { ViewToggle } from "@/components/ViewToggle";
+import type { ViewMode } from "@/components/ViewToggle";
+import { PipelineView } from "@/components/pipeline/PipelineView";
 import { usePacerEvents } from "@/hooks/usePacerEvents";
 import { usePlaylistPolling } from "@/hooks/usePlaylistPolling";
 import type { UploadResult } from "@/lib/types";
 
 export default function Home() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
+  const [videoState, setVideoState] = useState<"idle" | "playing" | "paused" | "waiting">("idle");
   const {
     segments,
     pacerState,
     events,
     speed,
     chaos,
+    segmentDuration,
     clearEvents,
   } = usePacerEvents();
 
@@ -57,6 +63,7 @@ export default function Home() {
   async function handleReset() {
     await fetch("/api/pacer/reset", { method: "POST" });
     setUploadResult(null);
+    setVideoState("idle");
     clearEvents();
   }
 
@@ -107,15 +114,29 @@ export default function Home() {
         onChaosToggle={handleChaosToggle}
       />
 
-      {/* Timeline (hero) */}
+      {/* View toggle + hero area */}
       <div className="border-b border-hairline">
-        <SegmentTimeline segments={segments} windowSequences={windowSequences} />
+        <ViewToggle mode={viewMode} onChange={setViewMode} />
+
+        {viewMode === "pipeline" ? (
+          <PipelineView
+            upload={uploadResult}
+            events={events}
+            pacerState={pacerState}
+            speed={speed}
+            segmentDuration={segmentDuration}
+            playlist={playlist}
+            videoState={videoState}
+          />
+        ) : (
+          <SegmentTimeline segments={segments} windowSequences={windowSequences} />
+        )}
       </div>
 
       {/* Playlist + Player */}
       <div className="grid grid-cols-2 gap-4 p-4 flex-1 min-h-[300px] border-b border-hairline">
         <PlaylistView playlist={playlist} />
-        <VideoPlayer active={isActive} />
+        <VideoPlayer active={isActive} onVideoStateChange={setVideoState} />
       </div>
 
       {/* Event Log */}
