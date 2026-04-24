@@ -98,6 +98,8 @@ export default function Home() {
         speed={speed}
         chaos={chaos}
         hasSegments={uploadResult !== null}
+        currentIndex={segments.filter(s => s.state !== "pending").length}
+        totalSegments={segments.length}
         onStart={handleStart}
         onPause={handlePause}
         onResume={handleResume}
