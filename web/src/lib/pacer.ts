@@ -31,6 +31,7 @@ export class Pacer {
       uploadId: this._uploadId,
       streamId: this._streamId,
       segments: [...this.segments],
+      segmentDuration: this.segmentDuration,
     };
   }
 

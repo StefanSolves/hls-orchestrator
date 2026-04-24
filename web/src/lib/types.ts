@@ -31,6 +31,7 @@ export interface PacerStatus {
   uploadId: string | null;
   streamId: string | null;
   segments: SegmentInfo[];
+  segmentDuration: number;
 }
 
 export interface UploadResult {

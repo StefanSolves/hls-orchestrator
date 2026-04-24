@@ -10,6 +10,7 @@ export function usePacerEvents() {
   const [speed, setSpeed] = useState(1);
   const [chaos, setChaos] = useState(false);
   const [streamId, setStreamId] = useState<string | null>(null);
+  const [segmentDuration, setSegmentDuration] = useState(2);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const connect = useCallback(() => {
@@ -29,6 +30,7 @@ export function usePacerEvents() {
           setSpeed(data.speed);
           setChaos(data.chaos);
           setStreamId(data.streamId);
+          setSegmentDuration(data.segmentDuration ?? 2);
         } else {
           // It's a PacerEvent
           setEvents((prev) => [...prev.slice(-199), data as PacerEvent]);
@@ -54,5 +56,5 @@ export function usePacerEvents() {
 
   const clearEvents = useCallback(() => setEvents([]), []);
 
-  return { segments, pacerState, events, speed, chaos, streamId, clearEvents };
+  return { segments, pacerState, events, speed, chaos, streamId, segmentDuration, clearEvents };
 }
