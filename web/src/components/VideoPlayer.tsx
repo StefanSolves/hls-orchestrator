@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Hls from "hls.js";
 
-type PlayerStatus = "idle" | "waiting-for-segments" | "buffering" | "playing";
+type PlayerStatus = "idle" | "waiting-for-segments" | "buffering" | "playing" | "vod";
 
 interface VideoPlayerProps {
   active: boolean;
@@ -32,6 +32,7 @@ export function VideoPlayer({ active, playlistReady, onVideoStateChange }: Video
       handleVideoStateChange("idle");
       setShowUnmuteOverlay(false);
       setPlayerStatus("idle");
+      setIsMuted(true);
     } else if (!playlistReady) {
       setPlayerStatus("waiting-for-segments");
     }
@@ -54,15 +55,19 @@ export function VideoPlayer({ active, playlistReady, onVideoStateChange }: Video
 
       const handlePlay = () => {
         handleVideoStateChange("playing");
-        setPlayerStatus("playing");
-        setShowUnmuteOverlay(true);
+        if (playerStatus !== "vod") {
+          setPlayerStatus("playing");
+          setShowUnmuteOverlay(true);
+        }
       };
       const handlePause = () => handleVideoStateChange("paused");
       const handleWaiting = () => handleVideoStateChange("waiting");
       const handlePlaying = () => {
         handleVideoStateChange("playing");
-        setPlayerStatus("playing");
-        setShowUnmuteOverlay(true);
+        if (playerStatus !== "vod") {
+          setPlayerStatus("playing");
+          setShowUnmuteOverlay(true);
+        }
       };
 
       video.addEventListener("play", handlePlay);
@@ -114,6 +119,17 @@ export function VideoPlayer({ active, playlistReady, onVideoStateChange }: Video
         }
       });
 
+      // Detect live → VOD transition when #EXT-X-ENDLIST appears
+      hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
+        if (data.details && !data.details.live) {
+          setPlayerStatus("vod");
+          setShowUnmuteOverlay(false);
+          // Seek to start so user can play from beginning
+          video.currentTime = 0;
+          video.pause();
+        }
+      });
+
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -151,7 +167,8 @@ export function VideoPlayer({ active, playlistReady, onVideoStateChange }: Video
     setShowUnmuteOverlay(false);
   }
 
-  const showLoadingOverlay = active && (playerStatus === "waiting-for-segments" || playerStatus === "buffering");
+  const isLoading = active && (playerStatus === "waiting-for-segments" || playerStatus === "buffering");
+  const isVod = playerStatus === "vod";
 
   return (
     <div className="flex flex-col h-full">
@@ -169,10 +186,10 @@ export function VideoPlayer({ active, playlistReady, onVideoStateChange }: Video
               ref={videoRef}
               className="w-full h-full object-contain"
               controls
-              muted={isMuted}
+              muted={isVod ? undefined : isMuted}
               playsInline
             />
-            {showLoadingOverlay && (
+            {isLoading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-bg/80">
                 <svg width="20" height="20" viewBox="0 0 20 20" className="animate-spin mb-2">
                   <circle cx="10" cy="10" r="8" fill="none" stroke="#D5D3CB" strokeWidth="2" />
@@ -183,7 +200,7 @@ export function VideoPlayer({ active, playlistReady, onVideoStateChange }: Video
                 </span>
               </div>
             )}
-            {showUnmuteOverlay && isMuted && !showLoadingOverlay && (
+            {showUnmuteOverlay && isMuted && !isLoading && !isVod && (
               <button
                 onClick={handleUnmute}
                 className="absolute inset-0 flex items-center justify-center bg-ink/30 transition-opacity hover:bg-ink/40"
