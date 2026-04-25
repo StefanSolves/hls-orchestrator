@@ -60,3 +60,4 @@ hls.js player ─────────> fetches playlist + segments through N
 - Single active session at a time — uploading again replaces the previous session
 - No authentication or multi-user support
 - The Go orchestrator's window size (6) is hardcoded and not adjustable at runtime
+- **Source video constraints**: The demo transcodes uploaded video on the fly using ffmpeg. Sources above 1080p are automatically downscaled. There's a 5-minute transcoding timeout. For best results, use videos ≤1080p and ≤2 minutes long. Long phone-shot 4K or 8K footage will work but takes longer to process; very large files may time out.

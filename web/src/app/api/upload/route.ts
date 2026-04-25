@@ -33,6 +33,9 @@ export async function POST(request: NextRequest) {
     await execFileAsync("ffmpeg", [
       "-y",
       "-i", inputPath,
+      // Downscale sources above 1080p to keep transcode time reasonable.
+      // No-op for sources ≤1920px wide. Height auto-computed, rounded to even.
+      "-vf", "scale='min(1920,iw)':-2",
       "-c:v", "libx264",
       "-profile:v", "baseline",
       "-level", "3.1",
@@ -50,12 +53,20 @@ export async function POST(request: NextRequest) {
       "-hls_segment_type", "mpegts",
       "-hls_segment_filename", segmentPattern,
       playlistPath,
-    ], { timeout: 120_000 });
+    ], { timeout: 300_000 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "ffmpeg failed";
     if (message.includes("ENOENT")) {
       return NextResponse.json(
         { error: "ffmpeg not found on PATH. Install ffmpeg to use this demo." },
+        { status: 500 }
+      );
+    }
+    // Node kills the process on timeout and sets err.killed = true
+    const isTimeout = err instanceof Error && "killed" in err && (err as NodeJS.ErrnoException & { killed?: boolean }).killed;
+    if (isTimeout) {
+      return NextResponse.json(
+        { error: "Transcoding took longer than 5 minutes. The source video may be too long or too high-resolution for this demo. Try a shorter clip." },
         { status: 500 }
       );
     }
