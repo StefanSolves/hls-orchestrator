@@ -20,6 +20,7 @@ export default function Home() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
   const [videoState, setVideoState] = useState<"idle" | "playing" | "paused" | "waiting">("idle");
+  const [resetKey, setResetKey] = useState(0);
   const {
     segments,
     pacerState,
@@ -65,6 +66,7 @@ export default function Home() {
     await fetch("/api/pacer/reset", { method: "POST" });
     setUploadResult(null);
     setVideoState("idle");
+    setResetKey((k) => k + 1);
     clearEvents();
   }
 
@@ -91,7 +93,7 @@ export default function Home() {
 
       {/* Upload */}
       <div className="px-4 py-4 border-b border-hairline">
-        <UploadPanel onUploadComplete={handleUpload} />
+        <UploadPanel onUploadComplete={handleUpload} resetKey={resetKey} />
       </div>
 
       {/* Controls */}
