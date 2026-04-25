@@ -10,6 +10,7 @@ interface ControlBarProps {
   hasSegments: boolean;
   currentIndex: number;
   totalSegments: number;
+  elapsedText: string;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -26,6 +27,7 @@ export function ControlBar({
   hasSegments,
   currentIndex,
   totalSegments,
+  elapsedText,
   onStart,
   onPause,
   onResume,
@@ -76,7 +78,7 @@ export function ControlBar({
   } else if (isPaused) {
     statusText = "paused \u2014 resume or end the stream";
   } else if (isEnded) {
-    statusText = "stream ended \u2014 reset to try another";
+    statusText = `stream complete \u2014 ${totalSegments} segments delivered in ${elapsedText}. reset to try another video.`;
   } else {
     statusText = "";
   }
@@ -115,7 +117,11 @@ export function ControlBar({
           >
             End
           </button>
-          <button onClick={onReset} className={btnSecondary}>
+          {/* Reset gets prominent styling when stream is ended */}
+          <button
+            onClick={onReset}
+            className={isEnded ? btnPrimary : btnSecondary}
+          >
             Reset
           </button>
         </div>
@@ -123,8 +129,8 @@ export function ControlBar({
         {/* Divider */}
         <div className="w-px h-6 bg-hairline" />
 
-        {/* Speed slider — local state for instant feedback, debounced POST */}
-        <div className="flex items-center gap-2">
+        {/* Speed slider — disabled when ended */}
+        <div className={`flex items-center gap-2 ${isEnded ? "opacity-40" : ""}`}>
           <label className="text-sm text-muted">Speed</label>
           <input
             type="range"
@@ -133,6 +139,7 @@ export function ControlBar({
             step={0.25}
             value={localSpeed}
             onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+            disabled={isEnded}
             className="w-28 accent-ink"
           />
           <span className="text-sm font-mono w-10 text-right">{localSpeed}x</span>
@@ -141,14 +148,15 @@ export function ControlBar({
         {/* Divider */}
         <div className="w-px h-6 bg-hairline" />
 
-        {/* Chaos toggle */}
+        {/* Chaos toggle — disabled when ended */}
         <button
           onClick={() => onChaosToggle(!chaos)}
+          disabled={isEnded}
           className={`${btnBase} border ${
             chaos
               ? "bg-coral-bg border-coral-border text-coral-ink"
               : "border-hairline text-muted"
-          }`}
+          } ${isEnded ? btnDisabled : ""}`}
         >
           Chaos {chaos ? "ON" : "OFF"}
         </button>

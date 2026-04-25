@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { UploadPanel } from "@/components/UploadPanel";
 import { ControlBar } from "@/components/ControlBar";
@@ -16,11 +16,19 @@ import { usePacerEvents } from "@/hooks/usePacerEvents";
 import { usePlaylistPolling } from "@/hooks/usePlaylistPolling";
 import type { UploadResult } from "@/lib/types";
 
+function formatDuration(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = Math.floor(totalSeconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 export default function Home() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
   const [videoState, setVideoState] = useState<"idle" | "playing" | "paused" | "waiting">("idle");
   const [resetKey, setResetKey] = useState(0);
+  const [elapsedText, setElapsedText] = useState("");
+  const streamStartRef = useRef<number | null>(null);
   const {
     segments,
     pacerState,
@@ -33,6 +41,22 @@ export default function Home() {
 
   const isActive = pacerState !== "idle";
   const { playlist, windowSequences } = usePlaylistPolling(isActive);
+
+  // Track stream start time for elapsed display
+  const prevStateRef = useRef(pacerState);
+  useEffect(() => {
+    if (prevStateRef.current !== "running" && pacerState === "running") {
+      streamStartRef.current = Date.now();
+    }
+    if (pacerState === "ended" && streamStartRef.current) {
+      setElapsedText(formatDuration((Date.now() - streamStartRef.current) / 1000));
+    }
+    if (pacerState === "idle") {
+      streamStartRef.current = null;
+      setElapsedText("");
+    }
+    prevStateRef.current = pacerState;
+  }, [pacerState]);
 
   const handleUpload = useCallback(async (result: UploadResult) => {
     setUploadResult(result);
@@ -104,6 +128,7 @@ export default function Home() {
         hasSegments={uploadResult !== null}
         currentIndex={segments.filter(s => s.state !== "pending").length}
         totalSegments={segments.length}
+        elapsedText={elapsedText}
         onStart={handleStart}
         onPause={handlePause}
         onResume={handleResume}
