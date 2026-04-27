@@ -8,8 +8,6 @@ import { SegmentTimeline } from "@/components/SegmentTimeline";
 import { PlaylistView } from "@/components/PlaylistView";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { EventLog } from "@/components/EventLog";
-import { ViewToggle } from "@/components/ViewToggle";
-import type { ViewMode } from "@/components/ViewToggle";
 import { PipelineView } from "@/components/pipeline/PipelineView";
 import { StreamCompleteBanner } from "@/components/StreamCompleteBanner";
 import { usePacerEvents } from "@/hooks/usePacerEvents";
@@ -24,7 +22,6 @@ function formatDuration(totalSeconds: number): string {
 
 export default function Home() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
   const [videoState, setVideoState] = useState<"idle" | "playing" | "paused" | "waiting">("idle");
   const [resetKey, setResetKey] = useState(0);
   const [elapsedText, setElapsedText] = useState("");
@@ -138,11 +135,10 @@ export default function Home() {
         onChaosToggle={handleChaosToggle}
       />
 
-      {/* View toggle + hero area */}
+      {/* Pipeline + Timeline (both always visible) */}
       <div className="border-b border-hairline">
-        <ViewToggle mode={viewMode} onChange={setViewMode} />
-
-        {viewMode === "pipeline" ? (
+        <section className="px-4 pt-4">
+          <h3 className="text-xs uppercase tracking-[0.18em] text-muted font-sans mb-3">Pipeline</h3>
           <PipelineView
             upload={uploadResult}
             events={events}
@@ -152,9 +148,12 @@ export default function Home() {
             playlist={playlist}
             videoState={videoState}
           />
-        ) : (
+        </section>
+
+        <section className="px-4 pt-6 pb-4">
+          <h3 className="text-xs uppercase tracking-[0.18em] text-muted font-sans mb-3">Timeline</h3>
           <SegmentTimeline segments={segments} windowSequences={windowSequences} />
-        )}
+        </section>
       </div>
 
       {/* Playlist + Player */}
